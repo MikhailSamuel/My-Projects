@@ -1,0 +1,181 @@
+---
+title: "Sales Transaction"
+auther : "Mikhail Samuel"
+output: html_document
+---
+
+`This is a sales transaction data set of UK-based e-commerce (online retail) for one year. This London-based shop has been selling gifts and homewares for adults and children through the website since 2007. Their customers come from all over the world and usually make direct purchases for themselves. There are also small businesses that buy in bulk and sell to other customers through retail outlet channels.  The data set contains 500K rows and 8 columns`{=html}
+
+:   `The following is the description of each column`{=html}
+
+:   1.  TransactionNo (categorical): a six-digit unique number that defines each transaction. The letter “C” in the code indicates a cancellation.
+
+    2.  Date (numeric): the date when each transaction was generated.
+
+    3.  ProductNo (categorical): a five or six-digit unique character used to identify a specific product.
+
+    4.  Product (categorical): product/item name.
+
+    5.  Price (numeric): the price of each product per unit in pound sterling (£).
+
+    6.  Quantity (numeric): the quantity of each product per transaction. Negative values related to cancelled transactions.
+
+    7.  CustomerNo (categorical): a five-digit unique number that defines each customer.
+
+    8.  Country (categorical): name of the country where the customer resides.
+
+GOALS
+
+:   1.  How was the sales trend over the months?
+
+    2.  What are the most frequently purchased products?
+
+    3.  How many products does the customer purchase in each transaction?
+
+    4.  What are the most profitable segment customers?
+
+    5.  Based on your findings, what strategy could you recommend to the business to gain more profit?
+
+```{r}
+
+library(tidyverse)
+library(tidymodels)
+library(skimr)
+library(ggplot2)
+library(plotly)
+library(gridExtra)
+library(e1071)
+```
+
+```{r}
+st <- read.csv("/Users/yn/Downloads/Sales Transaction v.4a.csv")
+head(st,50)
+tail(st,50)
+```
+
+| ***Some Statistics***
+
+```{r}
+skim(st)
+```
+
+| ***Clean** Sales Transaction*
+
+```{r}
+st <- drop_na(st)
+```
+
+```{r}
+#Thers is Quantity with minse that not make sens
+sum(st$Quantity < 0)
+st <- st[-st$Quantity < 0,]
+```
+
+| ***EDA for Sales Transaction***
+
+```{r}
+#I will create Total Salary for products
+st <- mutate(st,Total = Quantity * Price)
+
+#I will split Data column to Year,Month,Day
+st <- st %>% separate(Date,sep = "/",into = c("Month","Day","Year"),convert = TRUE)
+```
+
+`How was the sales trend over the months?`{=asciidoc}
+
+```{r}
+#here I'm descover the unique of year,month to plot them
+unique(st$Year)
+unique(st$Month)
+
+#here I'll devide the plot into two years by a sample
+set.seed(1000)
+p1 <- sample_n(st,10000,replace = TRUE)
+
+p1 <-
+    p1 |> 
+    ggplot(aes(Month,Total,color = as.factor(Year))) +
+    geom_point() +
+    scale_y_continuous(limits = c(0,5000)) +
+    labs(
+        title = "Sales in Months Trend",
+        color = "Years"
+    )
+ggplotly(p1,dynamicTicks = TRUE)
+
+```
+
+`What are the most frequently purchased products?`{=commonmark}
+
+```{r}
+#The most produts had been saled
+mostProducts <- st |> arrange(desc(Quantity)) |> head(50)
+mostProducts
+p2 <- qplot(data = mostProducts,x = Quantity,geom = "histogram",fill = ProductName)
+ggplotly(p2,dynamicTicks = TRUE)
+```
+
+`How many products does the customer purchase in each transaction?`{=asciidoc}
+
+```{r}
+#PCT is Numper of Products of Custtomers for each Transaction 
+NPCT <- st |> 
+  group_by(TransactionNo,CustomerNo) |> 
+  select(ProductName) |> 
+  summarise(NPCT = n()) |> 
+  arrange(desc(NPCT))
+head(NPCT,50)
+
+
+p3 <- qplot(x = CustomerNo,y = NPCT,data = NPCT,ylim = c(0,300))
+ggplotly(p3,dynamicTicks = TRUE)
+```
+
+`What are the most profitable segment customers?`{=asciidoc}
+
+```{r}
+#here I'll arrange the Date by Totsl column
+most_earn_cutomer <- 
+  st |> 
+  group_by(CustomerNo) |> 
+  select(CustomerNo,Total,Quantity) |> 
+  summarise(Total = sum(Total),
+            Quantity = sum(Quantity)) |> 
+  arrange(desc(Total))
+
+most_earn_cutomer
+```
+
+`Based on your findings, what strategy could you recommend to the business to gain more profit?`{=asciidoc}
+
+```{r}
+#First I need Top of Unit Price
+heigh_UP <- 
+  st |> distinct(ProductName,Price) |> 
+  arrange(desc(Price)) |> 
+  head(50)
+heigh_UP
+
+p4 <- 
+  heigh_UP |> 
+  ggplot(aes(Price,fill = "lightgreen")) + 
+  geom_histogram()
+ggplotly(p4,dynamicTicks = TRUE)
+
+#Second I need Top of Quantity
+heigh_Quantity <- 
+  st |> distinct(ProductName,Quantity) |>
+  arrange(desc(Quantity)) |> 
+  head(50)
+heigh_Quantity
+
+p4 <- 
+  heigh_Quantity |> 
+  ggplot(aes(Quantity)) + 
+  geom_histogram()
+ggplotly(p4)
+
+```
+
+| We can increase the price of quantity to make more heigh salary
+| we can offer about whose heigh price

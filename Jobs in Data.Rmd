@@ -1,0 +1,193 @@
+---
+title: "Jobs in Data"
+author: "Mikhail Samuel"
+date: "2024-02-11"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Collect and EDA data
+
+```{r}
+library(caret)
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(ggthemes)
+library(plotly)
+library(skimr)
+library(gridExtra)
+library(fastDummies)
+library(randomForest)
+library(e1071)
+```
+
+```{r}
+df <- read.csv("/Users/yn/mikhail/data science/dataset/jobs_in_data.csv")
+head(df)
+```
+
+```{r}
+skim(df)
+```
+
+Counts of each job
+
+```{r}
+p3 <- df %>%
+  ggplot(aes(job_category,fill = job_category)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 30, vjust = 0.3)) +
+  xlab(" ")
+  
+ggplotly(p3,dynamicTicks = TRUE)
+```
+
+How got match salary ?
+
+```{r}
+p1 <- 
+  df %>% 
+  group_by(job_category) |> 
+  ggplot(aes(salary_in_usd,fill = job_category)) +
+  geom_histogram() +
+  labs(
+    fill = "JOB",
+    title = "Salary VS The Count of the same salary for each job"
+  ) + xlab("Salary")
+ggplotly(p1,dynamicTicks = TRUE)
+
+```
+
+Is Experience important for Salary ?
+
+```{r}
+p2 <-
+  df %>%
+  ggplot(aes(salary_in_usd,fill = job_category)) +
+  geom_histogram() +
+  labs(
+    fill = "JOB",
+    title = "Experience VS Salary of the same experience for each job") + xlab("Salary") +
+  facet_wrap(~experience_level)
+ggplotly(p2,dynamicTicks = TRUE)
+```
+
+Salary over Years ,What is Trend for each job?
+
+```{r}
+p4 <- df %>%
+  ggplot(aes(work_year,salary_in_usd,color = job_category)) +
+  geom_smooth(method = "lm") +
+  facet_wrap(~job_category,ncol = 2 ) +
+  labs(
+    title = "Salary Trend",
+    color = "Job"
+  ) +
+  xlab("Salary") + ylab("Year") 
+ggplotly(p4,dynamicTicks = TRUE,width = 1000)
+
+```
+
+```{r}
+#Location VS Work
+#I removed the outlayers of company location
+count_for_each_country <- df %>%
+  group_by(company_location) %>%
+  summarise(n= n()) 
+
+unique(count_for_each_country$n)
+
+outCountries <- count_for_each_country[which(count_for_each_country$n  %in% c(113,449,8132,226)),]
+
+count_for_each_country <- count_for_each_country[
+  !count_for_each_country$n  %in% c(113,449,8132,226),
+]
+
+
+
+outCountries %>%
+  ggplot(aes(y = company_location,fill = company_location,label = n)) + 
+  geom_bar() +
+  coord_polar(theta = 'y')  + 
+  geom_label(stat = 'count',nudge_y = .325)
+
+
+
+```
+
+```{r}
+#time for each job
+p7 <- df %>%
+  ggplot(aes(x = employment_type,y = salary_in_usd,color = job_category)) + 
+  geom_point() +
+  facet_wrap(~job_category,ncol = 2) +
+  labs(
+    title = "Time for each job VS Salary",
+    color = "Job"
+  ) +
+  ylab("Salary") + xlab("") +
+  theme(axis.text.y = element_text(angle = 30,hjust = .3))
+
+ggplotly(p7,width = 1000)
+```
+
+```{r}
+#save dat
+write.csv(df,"my_data.csv")
+```
+
+Handle col's to predict
+
+```{r}
+df2 <-
+  df %>% 
+  select(work_year,job_category,salary_in_usd,experience_level,employment_type)
+```
+
+```{r}
+#fit and predict salary by linear regresion
+set.seed(1234)
+index <- initial_split(df2,prop = .8)
+trainSet <- training(index)
+testSet <- testing(index)
+
+fit1 <- lm(salary_in_usd ~.,data = trainSet)
+summary(fit1)
+
+pre1 <- predict(fit1,newdata = testSet)
+#enter per1 in test set
+testSet <- testSet %>% mutate(pre1 = pre1)
+#calculate R-squard and RMSE
+rsq1 <- rsq(testSet,truth = salary_in_usd,estimate = pre1 )
+rmse1 <- rmse(testSet,truth = salary_in_usd,estimat = pre1 )
+
+rsq1
+rmse1
+
+
+
+```
+
+```{r}
+set.seed(1234)
+#fit and predict salary by SVM
+fit2 <- svm(salary_in_usd ~.,data = trainSet)
+summary(fit2)
+
+pre2 <- predict(fit2,newdata = testSet)
+#enter per2 in test set
+testSet <- testSet %>% mutate(pre2 = pre2)
+#calculate R-squard and RMSE
+rsq2 <- rsq(testSet,truth = salary_in_usd,estimate = pre2 )
+rmse2 <- rmse(testSet,truth = salary_in_usd,estimat = pre2)
+
+
+rsq2
+rmse2
+
+
+plot(fit1)
+View(fit2)
+```
